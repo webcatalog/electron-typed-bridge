@@ -1,103 +1,34 @@
-/* eslint-disable @typescript-eslint/require-await */
-/* eslint-disable @typescript-eslint/no-unsafe-return */
-/* eslint-disable @typescript-eslint/no-unsafe-call */
-/* eslint-disable @typescript-eslint/no-unsafe-member-access */
-/* eslint-disable @typescript-eslint/no-unsafe-assignment */
+import { IpcMain, IpcMainEvent, WebContents, ipcMain } from 'electron';
 import { Observable, Subscription, isObservable } from 'rxjs';
-import { ipcMain, IpcMain, WebContents, IpcMainEvent } from 'electron';
-import Errio from 'errio';
-import { IpcProxyError, isFunction } from './utils';
+import { serializeError } from 'serialize-error';
+
 import {
+  ApplyRequest,
+  ApplySubscribeRequest,
+  GetRequest,
+  ProxyDescriptor,
   Request,
   RequestType,
   ResponseType,
-  GetRequest,
-  ApplyRequest,
   SubscribeRequest,
   UnsubscribeRequest,
-  ProxyDescriptor,
-  ProxyPropertyType,
-  ApplySubscribeRequest,
 } from './common';
-
-// TODO: make it to be able to use @decorator, instead of write a description json. We can defer the setup of ipc handler to make this possible.
-const registrations: { [channel: string]: ProxyServerHandler | null } = {};
-
-const exampleLogger = Object.assign(console, {
-  emerg: console.error.bind(console),
-  alert: console.error.bind(console),
-  crit: console.error.bind(console),
-  warning: console.warn.bind(console),
-  notice: console.log.bind(console),
-  debug: console.log.bind(console),
-});
-
-export function registerProxy<T>(target: T, descriptor: ProxyDescriptor, transport: IpcMain = ipcMain, logger?: typeof exampleLogger): VoidFunction {
-  const { channel } = descriptor;
-
-  if (registrations[channel] !== null && registrations[channel] !== undefined) {
-    throw new IpcProxyError(`Proxy object has already been registered on channel ${channel}`);
-  }
-
-  const server = new ProxyServerHandler(target);
-  registrations[channel] = server;
-
-  transport.on(channel, (event: IpcMainEvent, request: Request, correlationId: string) => {
-    let sender: WebContents | undefined = event.sender;
-    const nullify = (): void => {
-      sender = undefined;
-    };
-    sender.once('destroyed', nullify);
-
-    server
-      .handleRequest(request, sender)
-      .then((result) => {
-        if (sender !== undefined) {
-          // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
-          sender.send(correlationId, { type: ResponseType.Result, result });
-          sender.removeListener('destroyed', nullify);
-        }
-      })
-      .catch((error) => {
-        if (sender !== undefined) {
-          let stringifiedRequest = '';
-          try {
-            stringifiedRequest = request !== undefined ? JSON.stringify(request) : '';
-          } catch {
-            stringifiedRequest = request.type;
-          }
-          logger?.error?.(`E-0 IPC Error on ${channel} ${stringifiedRequest} ${(error as Error).message} ${(error as Error).stack ?? ''}`);
-          sender.send(correlationId, { type: ResponseType.Error, error: Errio.stringify(error) });
-          sender.removeListener('destroyed', nullify);
-        }
-      });
-  });
-
-  return () => unregisterProxy(channel, transport);
-}
-
-function unregisterProxy(channel: string, transport: IpcMain): void {
-  transport.removeAllListeners(channel);
-  const server = registrations[channel];
-
-  if (server === undefined) {
-    throw new IpcProxyError(`No proxy is registered on channel ${channel}`);
-  }
-
-  server?.unsubscribeAll?.();
-  // eslint-disable-next-line @typescript-eslint/no-dynamic-delete
-  delete registrations[channel];
-}
+import { IpcProxyError, isFunction } from './utils';
 
 class ProxyServerHandler {
   constructor(private readonly target: any) {}
 
-  private subscriptions: { [subscriptionId: string]: Subscription | undefined } = {};
+  private subscriptions: {
+    [subscriptionId: string]: Subscription | undefined;
+  } = {};
 
-  public async handleRequest(request: Request, sender: WebContents): Promise<any> {
+  public async handleRequest(
+    request: Request,
+    sender: WebContents,
+  ): Promise<any> {
     switch (request.type) {
       case RequestType.Get:
-        return await this.handleGet(request);
+        return this.handleGet(request);
       case RequestType.Apply:
         return this.handleApply(request);
       case RequestType.Subscribe:
@@ -112,7 +43,9 @@ class ProxyServerHandler {
   }
 
   public unsubscribeAll(): void {
-    Object.values(this.subscriptions).forEach((subscription) => subscription?.unsubscribe?.());
+    Object.values(this.subscriptions).forEach((subscription) =>
+      subscription?.unsubscribe(),
+    );
     this.subscriptions = {};
   }
 
@@ -122,58 +55,88 @@ class ProxyServerHandler {
 
   private handleApply(request: ApplyRequest): any {
     const { propKey, args } = request;
-    const function_ = this.target[propKey];
+    const remoteFunction = this.target[propKey];
 
-    if (!isFunction(function_)) {
+    if (!isFunction(remoteFunction)) {
       throw new IpcProxyError(`Remote property [${propKey}] is not a function`);
     }
 
-    return function_.apply(this.target, args);
+    return remoteFunction.apply(this.target, args);
   }
 
-  private handleSubscribe(request: SubscribeRequest, sender: WebContents): void {
+  private handleSubscribe(
+    request: SubscribeRequest,
+    sender: WebContents,
+  ): void {
     const { propKey, subscriptionId } = request;
     const obs = this.target[propKey];
 
     if (!isObservable(obs)) {
-      throw new IpcProxyError(`Remote property [${propKey}] is not an observable`);
+      throw new IpcProxyError(
+        `Remote property [${propKey}] is not an observable`,
+      );
     }
     if (typeof subscriptionId !== 'string') {
       // this will probably not happen
-      throw new IpcProxyError(`subscriptionId [${subscriptionId as unknown as string}] is not a string`);
+      throw new IpcProxyError(
+        `subscriptionId [${
+          subscriptionId as unknown as string
+        }] is not a string`,
+      );
     }
 
     this.doSubscribe(obs, subscriptionId, sender);
   }
 
-  private handleApplySubscribe(request: ApplySubscribeRequest, sender: WebContents): void {
+  private handleApplySubscribe(
+    request: ApplySubscribeRequest,
+    sender: WebContents,
+  ): void {
     const { propKey, subscriptionId, args } = request;
-    const function_ = this.target[propKey];
+    const remoteFunction = this.target[propKey];
 
-    if (!isFunction(function_)) {
+    if (!isFunction(remoteFunction)) {
       throw new IpcProxyError(`Remote property [${propKey}] is not a function`);
     }
 
-    const obs = function_.apply(this.target, args);
+    const obs = remoteFunction.apply(this.target, args);
 
     if (!isObservable(obs)) {
-      throw new IpcProxyError(`Remote function [${propKey}] did not return an observable`);
+      throw new IpcProxyError(
+        `Remote function [${propKey}] did not return an observable`,
+      );
     }
     if (typeof subscriptionId !== 'string') {
-      throw new IpcProxyError(`subscriptionId [${subscriptionId as unknown as string}] is not a string`);
+      throw new IpcProxyError(
+        `subscriptionId [${
+          subscriptionId as unknown as string
+        }] is not a string`,
+      );
     }
 
     this.doSubscribe(obs, subscriptionId, sender);
   }
 
-  private doSubscribe(obs: Observable<any>, subscriptionId: string, sender: WebContents): void {
+  private doSubscribe(
+    obs: Observable<any>,
+    subscriptionId: string,
+    sender: WebContents,
+  ): void {
     if (this.subscriptions[subscriptionId] !== undefined) {
-      throw new IpcProxyError(`A subscription with Id [${subscriptionId}] already exists`);
+      throw new IpcProxyError(
+        `A subscription with Id [${subscriptionId}] already exists`,
+      );
     }
 
+    // eslint-disable-next-line deprecation/deprecation
     this.subscriptions[subscriptionId] = obs.subscribe(
-      (value) => sender.send(subscriptionId, { type: ResponseType.Next, value }),
-      (error: Error) => sender.send(subscriptionId, { type: ResponseType.Error, error: Errio.stringify(error) }),
+      (value) =>
+        sender.send(subscriptionId, { type: ResponseType.Next, value }),
+      (error: Error) =>
+        sender.send(subscriptionId, {
+          type: ResponseType.Error,
+          error: JSON.stringify(serializeError(error, { maxDepth: 1 })),
+        }),
       () => sender.send(subscriptionId, { type: ResponseType.Complete }),
     );
 
@@ -194,7 +157,9 @@ class ProxyServerHandler {
     const { subscriptionId } = request;
 
     if (this.subscriptions[subscriptionId] === undefined) {
-      throw new IpcProxyError(`Subscription with Id [${subscriptionId}] does not exist`);
+      throw new IpcProxyError(
+        `Subscription with Id [${subscriptionId}] does not exist`,
+      );
     }
 
     this.doUnsubscribe(subscriptionId);
@@ -211,4 +176,94 @@ class ProxyServerHandler {
   }
 }
 
-export { ProxyDescriptor, ProxyPropertyType };
+// TODO: make it to be able to use @decorator, instead of write a description json. We can defer the setup of ipc handler to make this possible.
+const registrations: { [channel: string]: ProxyServerHandler | null } = {};
+
+/* eslint-disable no-console */
+const exampleLogger = Object.assign(console, {
+  emerg: console.error.bind(console),
+  alert: console.error.bind(console),
+  crit: console.error.bind(console),
+  warning: console.warn.bind(console),
+  notice: console.log.bind(console),
+  debug: console.log.bind(console),
+});
+/* eslint-enable no-console */
+
+function unregisterProxy(channel: string, transport: IpcMain): void {
+  transport.removeAllListeners(channel);
+  const server = registrations[channel];
+
+  if (server === undefined) {
+    throw new IpcProxyError(`No proxy is registered on channel ${channel}`);
+  }
+
+  server?.unsubscribeAll();
+  // eslint-disable-next-line @typescript-eslint/no-dynamic-delete
+  delete registrations[channel];
+}
+
+export function registerProxy<T>(
+  target: T,
+  descriptor: ProxyDescriptor,
+  transport: IpcMain = ipcMain,
+  logger?: typeof exampleLogger,
+): VoidFunction {
+  const { channel } = descriptor;
+
+  if (registrations[channel] !== null && registrations[channel] !== undefined) {
+    throw new IpcProxyError(
+      `Proxy object has already been registered on channel ${channel}`,
+    );
+  }
+
+  const server = new ProxyServerHandler(target);
+  registrations[channel] = server;
+
+  transport.on(
+    channel,
+    (event: IpcMainEvent, request: Request, correlationId: string) => {
+      // eslint-disable-next-line prefer-destructuring
+      let sender: WebContents | undefined = event.sender;
+      const nullify = (): void => {
+        sender = undefined;
+      };
+      sender.once('destroyed', nullify);
+
+      server
+        .handleRequest(request, sender)
+        .then((result) => {
+          if (sender !== undefined) {
+            // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
+            sender.send(correlationId, { type: ResponseType.Result, result });
+            sender.removeListener('destroyed', nullify);
+          }
+        })
+        .catch((error) => {
+          if (sender !== undefined) {
+            let stringifiedRequest = '';
+            try {
+              stringifiedRequest =
+                request !== undefined ? JSON.stringify(request) : '';
+            } catch {
+              stringifiedRequest = request.type;
+            }
+            logger?.error(
+              `E-0 IPC Error on ${channel} ${stringifiedRequest} ${
+                (error as Error).message
+              } ${(error as Error).stack ?? ''}`,
+            );
+            sender.send(correlationId, {
+              type: ResponseType.Error,
+              error: JSON.stringify(serializeError(error, { maxDepth: 1 })),
+            });
+            sender.removeListener('destroyed', nullify);
+          }
+        });
+    },
+  );
+
+  return () => unregisterProxy(channel, transport);
+}
+
+export { ProxyPropertyType, ProxyDescriptor } from './common';

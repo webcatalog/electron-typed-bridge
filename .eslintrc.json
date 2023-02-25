@@ -1,0 +1,58 @@
+{
+  "parser": "@typescript-eslint/parser",
+  "plugins": ["deprecation", "@typescript-eslint"],
+  "extends": [
+    "airbnb",
+    "airbnb/hooks",
+    "airbnb-typescript",
+    "plugin:prettier/recommended"
+  ],
+  "env": {
+    "browser": true
+  },
+  "settings": {
+    "import/resolver": {
+      "typescript": {
+        "project": ["tsconfig.json"]
+      },
+      "node": {
+        "project": ["tsconfig.json"]
+      }
+    }
+  },
+  "rules": {
+    "import/order": [0], // conflict with prettier
+    "import/prefer-default-export": [0],
+    "import/no-extraneous-dependencies": [
+      "error",
+      {
+        "devDependencies": true
+      }
+    ],
+    "react/function-component-definition": [
+      1,
+      {
+        "namedComponents": "arrow-function",
+        "unnamedComponents": "arrow-function"
+      }
+    ],
+    "@typescript-eslint/member-delimiter-style": [
+      "error",
+      {
+        "multiline": {
+          "delimiter": "semi", // 'none' or 'semi' or 'comma'
+          "requireLast": true
+        },
+        "singleline": {
+          "delimiter": "semi", // 'semi' or 'comma'
+          "requireLast": false
+        }
+      }
+    ],
+    "import/no-default-export": ["error"],
+    "deprecation/deprecation": "error"
+  },
+  "parserOptions": {
+    "project": "./tsconfig.json"
+  }
+}

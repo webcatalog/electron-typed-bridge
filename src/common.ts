@@ -1,12 +1,22 @@
-import { Asyncify, ConditionalKeys } from 'type-fest';
 import { Observable } from 'rxjs';
+import { Asyncify, ConditionalKeys } from 'type-fest';
 
-export type ProxyAsyncProperties<OriginalProxy> = ConditionalKeys<OriginalProxy, (..._arguments: never) => any>;
-export type ProxyObservableProperties<OriginalProxy> =
-  | ConditionalKeys<OriginalProxy, Observable<unknown>>
-  | ConditionalKeys<OriginalProxy, (..._arguments: never) => Observable<unknown>>;
-export type ProxyWithOnlyObservable<OriginalProxy> = Pick<OriginalProxy, ProxyObservableProperties<OriginalProxy>>;
-export type ProxyWithOutObservable<OriginalProxy> = Omit<OriginalProxy, ProxyObservableProperties<OriginalProxy>>;
+export type ProxyAsyncProperties<OriginalProxy> = ConditionalKeys<
+  OriginalProxy,
+  (..._arguments: never) => any
+>;
+export type ProxyObservableProperties<OriginalProxy> = ConditionalKeys<
+  OriginalProxy,
+  Observable<unknown>
+>;
+export type ProxyWithOnlyObservable<OriginalProxy> = Pick<
+  OriginalProxy,
+  ProxyObservableProperties<OriginalProxy>
+>;
+export type ProxyWithOutObservable<OriginalProxy> = Omit<
+  OriginalProxy,
+  ProxyObservableProperties<OriginalProxy>
+>;
 
 /**
  * To call services that is located in main process, from the renderer process, we use IPC.invoke, so all method should now promisify
@@ -15,7 +25,10 @@ export type ProxyWithOutObservable<OriginalProxy> = Omit<OriginalProxy, ProxyObs
 export type AsyncifyProxy<
   OriginalProxy extends Record<string, any>,
   ObservableKey extends ProxyObservableProperties<OriginalProxy> = ProxyObservableProperties<OriginalProxy>,
-  AsyncKey extends Exclude<ProxyAsyncProperties<OriginalProxy>, ObservableKey> = Exclude<ProxyAsyncProperties<OriginalProxy>, ObservableKey>,
+  AsyncKey extends Exclude<
+    ProxyAsyncProperties<OriginalProxy>,
+    ObservableKey
+  > = Exclude<ProxyAsyncProperties<OriginalProxy>, ObservableKey>,
 > = {
   [P in AsyncKey]: Asyncify<OriginalProxy[P]>;
 } & {
@@ -33,7 +46,6 @@ export type IServicesWithoutObservables<Services> = {
 /* Proxy Descriptor Types */
 export enum ProxyPropertyType {
   Function = 'function',
-  Function$ = 'function$',
   Value = 'value',
   Value$ = 'value$',
 }
@@ -85,7 +97,13 @@ export interface UnsubscribeRequest {
   type: RequestType.Unsubscribe;
 }
 
-export type Request = UnknownRequest | GetRequest | ApplyRequest | SubscribeRequest | ApplySubscribeRequest | UnsubscribeRequest;
+export type Request =
+  | UnknownRequest
+  | GetRequest
+  | ApplyRequest
+  | SubscribeRequest
+  | ApplySubscribeRequest
+  | UnsubscribeRequest;
 
 /* Response Types */
 export enum ResponseType {
@@ -101,7 +119,7 @@ export interface ResultResponse {
 }
 
 export interface ErrorResponse {
-  error: Error;
+  error: string;
   type: ResponseType.Error;
 }
 
@@ -114,4 +132,8 @@ export interface CompleteResponse {
   type: ResponseType.Complete;
 }
 
-export type Response = ResultResponse | ErrorResponse | NextResponse | CompleteResponse;
+export type Response =
+  | ResultResponse
+  | ErrorResponse
+  | NextResponse
+  | CompleteResponse;

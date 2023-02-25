@@ -1,1 +1,2 @@
-* text=auto
+# This is equivalent to setting core.autocrlf = false.
+* -text
