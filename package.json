@@ -64,7 +64,7 @@
     "@trivago/prettier-plugin-sort-imports": "^4.1.1",
     "lodash": "^4.17.21",
     "serialize-error": "^11.0.0",
-    "type-fest": "^2.19.0"
+    "type-fest": "^4.2.0"
   },
   "devDependencies": {
     "@types/eslint": "^8.21.1",
