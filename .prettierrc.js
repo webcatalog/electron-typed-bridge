@@ -6,18 +6,13 @@ const config = {
   tabWidth: 2,
   semi: true,
   singleQuote: true,
-  importOrder: [
-    '^(.*)/register$',
-    '<THIRD_PARTY_MODULES>',
-    '<THIRD_PARTY_TS_TYPES>',
-    '^[./]',
-    '<TS_TYPES>^[./]',
-  ],
+  importOrder: ['^(.*)/register$', '<THIRD_PARTY_MODULES>', '^[./]'],
   importOrderSeparation: true,
   importOrderSortSpecifiers: true,
   importOrderCaseInsensitive: false,
   importOrderGroupNamespaceSpecifiers: false,
   importOrderParserPlugins: ['typescript', 'jsx', 'decorators-legacy'],
+  plugins: ['@trivago/prettier-plugin-sort-imports'],
 };
 
 module.exports = config;
