@@ -24,7 +24,8 @@ export type ProxyWithOutObservable<OriginalProxy> = Omit<
  */
 export type AsyncifyProxy<
   OriginalProxy extends Record<string, any>,
-  ObservableKey extends ProxyObservableProperties<OriginalProxy> = ProxyObservableProperties<OriginalProxy>,
+  ObservableKey extends
+    ProxyObservableProperties<OriginalProxy> = ProxyObservableProperties<OriginalProxy>,
   AsyncKey extends Exclude<
     ProxyAsyncProperties<OriginalProxy>,
     ObservableKey

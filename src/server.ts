@@ -43,8 +43,8 @@ class ProxyServerHandler {
   }
 
   public unsubscribeAll(): void {
-    Object.values(this.subscriptions).forEach((subscription) =>
-      subscription?.unsubscribe(),
+    Object.values(this.subscriptions).forEach(
+      (subscription) => subscription?.unsubscribe(),
     );
     this.subscriptions = {};
   }
