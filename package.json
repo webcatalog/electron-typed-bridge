@@ -85,7 +85,7 @@
     "eslint-plugin-react-hooks": "^4.6.0",
     "npm-install-peers": "^1.2.2",
     "prettier": "^2.8.4",
-    "typescript": "^4.9.5",
+    "typescript": "^5.1.6",
     "typesync": "^0.10.0"
   },
   "peerDependencies": {
