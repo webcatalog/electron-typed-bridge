@@ -51,7 +51,7 @@
     "main",
     "renderer"
   ],
-  "author": "WebCatalog Ltd",
+  "author": "WebCatalog Pte. Ltd.",
   "license": "MIT",
   "bugs": {
     "url": "https://github.com/webcatalog/electron-typed-bridge/issues"
